@@ -12,20 +12,24 @@ The Weather Agent is a minimalist chatbot built using **Pydantic AI** and **Stre
 - **Default Model:** `gpt-4o-mini` (configurable via `LLM_MODEL` environment variable)
 
 ### 2. Tools
-The agent has access to the following tool:
+The agent has access to the following tools:
 
-#### `get_weather`
-- **Description:** Fetches current weather for a specific location.
-- **Implementation Details:**
-  - Uses `httpx` for asynchronous HTTP requests.
-  - First calls the **Open-Meteo Geocoding API** to convert a location name (e.g., "London") into latitude and longitude.
-  - Then calls the **Open-Meteo Forecast API** to get current weather data.
+#### `get_location_coordinates`
+- **Description:** Finds the latitude and longitude for a given location name.
 - **Parameters:**
   - `location` (str): The name of the city/country.
+- **Returns:** A dictionary containing `latitude`, `longitude`, and `city_name`.
+
+#### `get_weather_by_coords`
+- **Description:** Fetches current weather for specific coordinates.
+- **Parameters:**
+  - `latitude` (float): Latitude.
+  - `longitude` (float): Longitude.
+- **Returns:** A formatted string with temperature and windspeed.
 
 ## Operational Instructions
-- The agent should always use the `get_weather` tool when asked about the weather.
-- If a location is ambiguous or not found, the agent should ask for clarification.
+- To provide weather info, the agent MUST first call `get_location_coordinates` followed by `get_weather_by_coords`.
+- This demonstrates the agent's ability to chain multiple tool calls to resolve a user request.
 - Temperatures are returned in Celsius (°C) and windspeeds in km/h.
 
 ## Environment Variables

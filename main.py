@@ -23,20 +23,22 @@ model = OpenAIChatModel(llm)
 # Define the Agent
 weather_agent = Agent(
     model,
-    system_prompt="You are a helpful weather assistant. Use the get_weather tool to provide accurate information.",
+    system_prompt=(
+        "You are a helpful weather assistant. "
+        "To provide weather information, you must first find the coordinates of the location using `get_location_coordinates`, "
+        "then use those coordinates to get the weather with `get_weather_by_coords`."
+    ),
 )
 
 
 @weather_agent.tool
-async def get_weather(ctx: RunContext[None], location: str) -> str:
+async def get_location_coordinates(ctx: RunContext[None], location: str) -> dict[str, float | str]:
     """
-    Get the current weather for a given location.
+    Find the latitude and longitude for a given location name.
 
     Args:
         location: The city and country, e.g., "Paris, France"
     """
-    print(f"Checking weather of {location}")
-    # Use Open-Meteo geocoding to find coordinates
     async with httpx.AsyncClient(timeout=60) as client:
         geo_resp = await client.get(
             "https://geocoding-api.open-meteo.com/v1/search",
@@ -45,26 +47,38 @@ async def get_weather(ctx: RunContext[None], location: str) -> str:
         geo_data = geo_resp.json()
 
         if not geo_data.get("results"):
-            print(f"Could not find coordinates for {location}.")
-            return f"Could not find coordinates for {location}."
+            return {"error": f"Could not find coordinates for {location}."}
 
         result = geo_data["results"][0]
-        lat, lon = result["latitude"], result["longitude"]
-        city_name = result["name"]
+        return {
+            "latitude": result["latitude"],
+            "longitude": result["longitude"],
+            "city_name": result["name"]
+        }
 
-        # Get current weather
+
+@weather_agent.tool
+async def get_weather_by_coords(ctx: RunContext[None], latitude: float, longitude: float) -> str:
+    """
+    Get the current weather for specific coordinates.
+
+    Args:
+        latitude: The latitude coordinate.
+        longitude: The longitude coordinate.
+    """
+    async with httpx.AsyncClient(timeout=60) as client:
         weather_resp = await client.get(
             "https://api.open-meteo.com/v1/forecast",
-            params={"latitude": lat, "longitude": lon, "current_weather": True},
+            params={"latitude": latitude, "longitude": longitude, "current_weather": True},
         )
         weather_data = weather_resp.json()
         current = weather_data.get("current_weather")
 
         if not current:
-            return f"Could not retrieve weather for {city_name}."
+            return "Could not retrieve weather for these coordinates."
 
         return (
-            f"The current weather in {city_name} is {current['temperature']}°C "
+            f"The current weather is {current['temperature']}°C "
             f"with a windspeed of {current['windspeed']} km/h."
         )
 
