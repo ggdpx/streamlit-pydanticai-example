@@ -47,7 +47,7 @@ async def fetch_location_coordinates(location: str) -> dict[str, float | str]:
         return {
             "latitude": result["latitude"],
             "longitude": result["longitude"],
-            "city_name": result["name"]
+            "city_name": result["name"],
         }
 
 
@@ -56,7 +56,11 @@ async def fetch_weather_by_coords(latitude: float, longitude: float) -> str:
     async with httpx.AsyncClient(timeout=60) as client:
         weather_resp = await client.get(
             "https://api.open-meteo.com/v1/forecast",
-            params={"latitude": latitude, "longitude": longitude, "current_weather": True},
+            params={
+                "latitude": latitude,
+                "longitude": longitude,
+                "current_weather": True,
+            },
         )
         weather_data = weather_resp.json()
         current = weather_data.get("current_weather")
@@ -71,19 +75,23 @@ async def fetch_weather_by_coords(latitude: float, longitude: float) -> str:
 
 
 @weather_agent.tool
-async def get_location_coordinates(ctx: RunContext[None], location: str) -> dict[str, float | str]:
+async def get_location_coordinates(
+    ctx: RunContext[None], location: str
+) -> dict[str, float | str]:
     """
     Find the latitude and longitude for a given location name.
 
     Args:
         location: The city and country, e.g., "Paris, France"
     """
-    print(f"Getting coordinates of {location}")
-    return await fetch_location_coordinates(location)
+    with st.status(f"Finding coordinates for {location}...", expanded=False):
+        return await fetch_location_coordinates(location)
 
 
 @weather_agent.tool
-async def get_weather_by_coords(ctx: RunContext[None], latitude: float, longitude: float) -> str:
+async def get_weather_by_coords(
+    ctx: RunContext[None], latitude: float, longitude: float
+) -> str:
     """
     Get the current weather for specific coordinates.
 
@@ -91,8 +99,8 @@ async def get_weather_by_coords(ctx: RunContext[None], latitude: float, longitud
         latitude: The latitude coordinate.
         longitude: The longitude coordinate.
     """
-    print(f"Getting weather of {latitude}, {longitude}")
-    return await fetch_weather_by_coords(latitude, longitude)
+    with st.status(f"Fetching weather for {latitude}, {longitude}...", expanded=False):
+        return await fetch_weather_by_coords(latitude, longitude)
 
 
 def filter_new_messages(new_messages):
@@ -107,29 +115,41 @@ def filter_new_messages(new_messages):
     ]
 
 
-async def handle_agent_stream(user_input: str, message_placeholder):
+async def handle_agent_stream(user_input: str):
     """Handles the agent's stream, updating the UI and session state."""
     run_stream_cm = weather_agent.run_stream(
         user_input,
         message_history=st.session_state.messages[:-1],
     )
 
-    with st.spinner("Thinking..."):
-        result = await run_stream_cm.__aenter__()
-        try:
-            partial_text = ""
-            stream = result.stream_text(delta=True)
+    # 1. Create a placeholder for tool calls (thoughts)
+    thoughts_placeholder = st.empty()
 
-            # Wait for the first chunk to arrive while showing the spinner
+    with thoughts_placeholder.container():
+        with st.spinner("Thinking..."):
+            result = await run_stream_cm.__aenter__()
             try:
-                first_chunk = await anext(stream)
-                partial_text += first_chunk
-                message_placeholder.markdown(partial_text)
-            except StopAsyncIteration:
-                pass
-        except Exception as e:
-            await run_stream_cm.__aexit__(type(e), e, e.__traceback__)
-            raise
+                partial_text = ""
+                stream = result.stream_text(delta=True)
+
+                # Wait for the first chunk to arrive while showing the spinner
+                try:
+                    first_chunk = await anext(stream)
+                    partial_text += first_chunk
+                except StopAsyncIteration:
+                    pass
+            except Exception as e:
+                await run_stream_cm.__aexit__(type(e), e, e.__traceback__)
+                raise
+
+    # 2. OPTIONAL: Hide tool calls when text starts
+    # To hide them, uncomment the next line:
+    # thoughts_placeholder.empty()
+
+    # 3. Create the message placeholder AFTER the tools to ensure correct order
+    message_placeholder = st.empty()
+    if partial_text:
+        message_placeholder.markdown(partial_text)
 
     # The spinner disappears here. Now we continue streaming the rest of the response.
     try:
@@ -144,8 +164,7 @@ async def handle_agent_stream(user_input: str, message_placeholder):
 
 async def run_agent_with_streaming(user_input: str):
     """Run the agent and stream the response to the UI."""
-    message_placeholder = st.empty()
-    await handle_agent_stream(user_input, message_placeholder)
+    await handle_agent_stream(user_input)
 
 
 def init_session_state():
@@ -163,10 +182,12 @@ def display_chat_messages(messages):
                     with st.chat_message("user"):
                         st.markdown(part.content)
         elif isinstance(msg, ModelResponse):
-            for part in msg.parts:
-                if isinstance(part, TextPart):
-                    with st.chat_message("assistant"):
-                        st.markdown(part.content)
+            # Check if there is any text to display to avoid empty assistant bubbles
+            if any(isinstance(p, TextPart) for p in msg.parts):
+                with st.chat_message("assistant"):
+                    for part in msg.parts:
+                        if isinstance(part, TextPart):
+                            st.markdown(part.content)
 
 
 def render_suggestions(suggestions: list[str]) -> str | None:
@@ -181,6 +202,12 @@ def render_suggestions(suggestions: list[str]) -> str | None:
 async def main():
     st.title("Minimalist Weather Chatbot")
     st.write("Ask me about the weather anywhere in the world!")
+    suggestion = render_suggestions(
+        [
+            "What is the weather in Paris, France",
+            "What is the weather in 3 biggest cities of UK",
+        ]
+    )
 
     init_session_state()
 
@@ -191,10 +218,7 @@ async def main():
     user_input = st.chat_input("What's the weather like in...")
 
     # Display suggestions as buttons
-    suggestion = render_suggestions([
-        "What is the weather in Paris, France",
-        "What is the weather in 3 biggest cities of UK",
-    ])
+
     if suggestion:
         user_input = suggestion
 
