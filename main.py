@@ -153,8 +153,22 @@ async def main():
                     with st.chat_message("assistant"):
                         st.markdown(part.content)
 
-    # Chat input
-    if user_input := st.chat_input("What's the weather like in..."):
+    # Suggestions
+    suggestions = [
+        "What is the weather in Paris, France",
+        "What is the weather in 3 biggest cities of UK",
+    ]
+
+    # Handle chat input and suggestions
+    user_input = st.chat_input("What's the weather like in...")
+
+    # Display suggestions as buttons
+    cols = st.columns(len(suggestions))
+    for i, suggestion in enumerate(suggestions):
+        if cols[i].button(suggestion, use_container_width=True):
+            user_input = suggestion
+
+    if user_input:
         st.session_state.messages.append(
             ModelRequest(parts=[UserPromptPart(content=user_input)])
         )
