@@ -31,15 +31,8 @@ weather_agent = Agent(
 )
 
 
-@weather_agent.tool
-async def get_location_coordinates(ctx: RunContext[None], location: str) -> dict[str, float | str]:
-    """
-    Find the latitude and longitude for a given location name.
-
-    Args:
-        location: The city and country, e.g., "Paris, France"
-    """
-    print(f"Getting coordinates of {location}")
+async def fetch_location_coordinates(location: str) -> dict[str, float | str]:
+    """Fetch latitude and longitude for a given location using the Open-Meteo Geocoding API."""
     async with httpx.AsyncClient(timeout=60) as client:
         geo_resp = await client.get(
             "https://geocoding-api.open-meteo.com/v1/search",
@@ -58,16 +51,8 @@ async def get_location_coordinates(ctx: RunContext[None], location: str) -> dict
         }
 
 
-@weather_agent.tool
-async def get_weather_by_coords(ctx: RunContext[None], latitude: float, longitude: float) -> str:
-    """
-    Get the current weather for specific coordinates.
-
-    Args:
-        latitude: The latitude coordinate.
-        longitude: The longitude coordinate.
-    """
-    print(f"Getting weather of {latitude}, {longitude}")
+async def fetch_weather_by_coords(latitude: float, longitude: float) -> str:
+    """Fetch current weather for specific coordinates using the Open-Meteo Forecast API."""
     async with httpx.AsyncClient(timeout=60) as client:
         weather_resp = await client.get(
             "https://api.open-meteo.com/v1/forecast",
@@ -83,6 +68,31 @@ async def get_weather_by_coords(ctx: RunContext[None], latitude: float, longitud
             f"The current weather is {current['temperature']}°C "
             f"with a windspeed of {current['windspeed']} km/h."
         )
+
+
+@weather_agent.tool
+async def get_location_coordinates(ctx: RunContext[None], location: str) -> dict[str, float | str]:
+    """
+    Find the latitude and longitude for a given location name.
+
+    Args:
+        location: The city and country, e.g., "Paris, France"
+    """
+    print(f"Getting coordinates of {location}")
+    return await fetch_location_coordinates(location)
+
+
+@weather_agent.tool
+async def get_weather_by_coords(ctx: RunContext[None], latitude: float, longitude: float) -> str:
+    """
+    Get the current weather for specific coordinates.
+
+    Args:
+        latitude: The latitude coordinate.
+        longitude: The longitude coordinate.
+    """
+    print(f"Getting weather of {latitude}, {longitude}")
+    return await fetch_weather_by_coords(latitude, longitude)
 
 
 # Streamlit UI
