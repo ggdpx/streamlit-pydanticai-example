@@ -11,6 +11,11 @@ A real-time weather assistant demonstrating:
 - **Asynchronous Tool Calling**: Fetches coordinates and weather data using `httpx`.
 - **Native Streaming**: Tokens piped directly into Streamlit's chat UI.
 
+### 2. Web Search Assistant (`search.py`)
+A research assistant that can search the web to answer questions:
+- **Built-in Tooling**: Uses PydanticAI's `WebSearchTool` for seamless search integration.
+- **Multiple Searches**: Capable of performing multiple queries to provide comprehensive answers.
+
 ## 🏁 Quick Start
 
 ```sh
