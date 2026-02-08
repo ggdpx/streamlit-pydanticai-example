@@ -39,5 +39,5 @@ Ensure the following are set in your `.env` file:
 
 ## How to Extend
 To add more capabilities:
-1. Define a new `@weather_agent.tool` in `main.py`.
+1. Define a new `@weather_agent.tool` in `weather.py`.
 2. Update the system prompt if necessary to guide the agent on when to use the new tool.
