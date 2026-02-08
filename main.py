@@ -95,12 +95,20 @@ async def get_weather_by_coords(ctx: RunContext[None], latitude: float, longitud
     return await fetch_weather_by_coords(latitude, longitude)
 
 
-# Streamlit UI
-async def run_agent_with_streaming(user_input: str):
-    """Run the agent and stream the response to the UI."""
-    message_placeholder = st.empty()
+def filter_new_messages(new_messages):
+    """Filter out user prompt parts from the new messages to avoid duplication in history."""
+    return [
+        msg
+        for msg in new_messages
+        if not (
+            isinstance(msg, ModelRequest)
+            and any(isinstance(p, UserPromptPart) for p in msg.parts)
+        )
+    ]
 
-    # Use a manual context manager to have better control over the spinner
+
+async def handle_agent_stream(user_input: str, message_placeholder):
+    """Handles the agent's stream, updating the UI and session state."""
     run_stream_cm = weather_agent.run_stream(
         user_input,
         message_history=st.session_state.messages[:-1],
@@ -112,7 +120,7 @@ async def run_agent_with_streaming(user_input: str):
             partial_text = ""
             stream = result.stream_text(delta=True)
 
-            # Wait for the first chunk to arrive
+            # Wait for the first chunk to arrive while showing the spinner
             try:
                 first_chunk = await anext(stream)
                 partial_text += first_chunk
@@ -129,18 +137,15 @@ async def run_agent_with_streaming(user_input: str):
             partial_text += chunk
             message_placeholder.markdown(partial_text)
 
-        # Update session state with new messages
-        filtered_messages = [
-            msg
-            for msg in result.new_messages()
-            if not (
-                isinstance(msg, ModelRequest)
-                and any(isinstance(p, UserPromptPart) for p in msg.parts)
-            )
-        ]
-        st.session_state.messages.extend(filtered_messages)
+        st.session_state.messages.extend(filter_new_messages(result.new_messages()))
     finally:
         await run_stream_cm.__aexit__(None, None, None)
+
+
+async def run_agent_with_streaming(user_input: str):
+    """Run the agent and stream the response to the UI."""
+    message_placeholder = st.empty()
+    await handle_agent_stream(user_input, message_placeholder)
 
 
 async def main():
