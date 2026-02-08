@@ -39,6 +39,7 @@ async def get_location_coordinates(ctx: RunContext[None], location: str) -> dict
     Args:
         location: The city and country, e.g., "Paris, France"
     """
+    print(f"Getting coordinates of {location}")
     async with httpx.AsyncClient(timeout=60) as client:
         geo_resp = await client.get(
             "https://geocoding-api.open-meteo.com/v1/search",
@@ -66,6 +67,7 @@ async def get_weather_by_coords(ctx: RunContext[None], latitude: float, longitud
         latitude: The latitude coordinate.
         longitude: The longitude coordinate.
     """
+    print(f"Getting weather of {latitude}, {longitude}")
     async with httpx.AsyncClient(timeout=60) as client:
         weather_resp = await client.get(
             "https://api.open-meteo.com/v1/forecast",
@@ -86,19 +88,38 @@ async def get_weather_by_coords(ctx: RunContext[None], latitude: float, longitud
 # Streamlit UI
 async def run_agent_with_streaming(user_input: str):
     """Run the agent and stream the response to the UI."""
-    async with weather_agent.run_stream(
+    message_placeholder = st.empty()
+
+    # Use a manual context manager to have better control over the spinner
+    run_stream_cm = weather_agent.run_stream(
         user_input,
         message_history=st.session_state.messages[:-1],
-    ) as result:
-        partial_text = ""
-        message_placeholder = st.empty()
+    )
 
-        async for chunk in result.stream_text(delta=True):
+    with st.spinner("Thinking..."):
+        result = await run_stream_cm.__aenter__()
+        try:
+            partial_text = ""
+            stream = result.stream_text(delta=True)
+
+            # Wait for the first chunk to arrive
+            try:
+                first_chunk = await anext(stream)
+                partial_text += first_chunk
+                message_placeholder.markdown(partial_text)
+            except StopAsyncIteration:
+                pass
+        except Exception as e:
+            await run_stream_cm.__aexit__(type(e), e, e.__traceback__)
+            raise
+
+    # The spinner disappears here. Now we continue streaming the rest of the response.
+    try:
+        async for chunk in stream:
             partial_text += chunk
             message_placeholder.markdown(partial_text)
 
         # Update session state with new messages
-        # We exclude the user prompt from result.new_messages() as it's already added
         filtered_messages = [
             msg
             for msg in result.new_messages()
@@ -108,6 +129,8 @@ async def run_agent_with_streaming(user_input: str):
             )
         ]
         st.session_state.messages.extend(filtered_messages)
+    finally:
+        await run_stream_cm.__aexit__(None, None, None)
 
 
 async def main():
