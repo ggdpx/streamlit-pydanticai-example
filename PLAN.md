@@ -2,15 +2,15 @@
 
 This document outlines the planned refactoring and organizational improvements for the Streamlit Pydantic AI Weather Chatbot, ranked from least to most impactful.
 
-## 1. Initialize Session State
+## 1. Initialize Session State (COMPLETED)
 *   **Action:** Move `st.session_state` initialization into a dedicated `init_session_state()` function.
 *   **Impact:** Reduces boilerplate in the `main()` function and centralizes state management.
 
-## 2. Extract Suggestion Rendering
+## 2. Extract Suggestion Rendering (COMPLETED)
 *   **Action:** Create a `render_suggestions(suggestions)` function to handle the column and button logic.
 *   **Impact:** Cleans up the main UI flow and makes the suggestion logic reusable or easier to modify.
 
-## 3. Encapsulate Chat History Display
+## 3. Encapsulate Chat History Display (COMPLETED)
 *   **Action:** Create a `display_chat_messages(messages)` function to handle the iteration and type-checking of Pydantic AI messages.
 *   **Impact:** Significantly improves readability of the `main()` loop by hiding the complexity of message part parsing.
 

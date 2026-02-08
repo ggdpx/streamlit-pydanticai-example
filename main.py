@@ -148,15 +148,15 @@ async def run_agent_with_streaming(user_input: str):
     await handle_agent_stream(user_input, message_placeholder)
 
 
-async def main():
-    st.title("Minimalist Weather Chatbot")
-    st.write("Ask me about the weather anywhere in the world!")
-
+def init_session_state():
+    """Initialize the session state for the application."""
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Display chat history
-    for msg in st.session_state.messages:
+
+def display_chat_messages(messages):
+    """Iterate through and display the chat history."""
+    for msg in messages:
         if isinstance(msg, ModelRequest):
             for part in msg.parts:
                 if isinstance(part, UserPromptPart):
@@ -168,20 +168,35 @@ async def main():
                     with st.chat_message("assistant"):
                         st.markdown(part.content)
 
-    # Suggestions
-    suggestions = [
-        "What is the weather in Paris, France",
-        "What is the weather in 3 biggest cities of UK",
-    ]
+
+def render_suggestions(suggestions: list[str]) -> str | None:
+    """Render suggestion buttons and return the clicked suggestion if any."""
+    cols = st.columns(len(suggestions))
+    for i, suggestion in enumerate(suggestions):
+        if cols[i].button(suggestion, use_container_width=True):
+            return suggestion
+    return None
+
+
+async def main():
+    st.title("Minimalist Weather Chatbot")
+    st.write("Ask me about the weather anywhere in the world!")
+
+    init_session_state()
+
+    # Display chat history
+    display_chat_messages(st.session_state.messages)
 
     # Handle chat input and suggestions
     user_input = st.chat_input("What's the weather like in...")
 
     # Display suggestions as buttons
-    cols = st.columns(len(suggestions))
-    for i, suggestion in enumerate(suggestions):
-        if cols[i].button(suggestion, use_container_width=True):
-            user_input = suggestion
+    suggestion = render_suggestions([
+        "What is the weather in Paris, France",
+        "What is the weather in 3 biggest cities of UK",
+    ])
+    if suggestion:
+        user_input = suggestion
 
     if user_input:
         st.session_state.messages.append(
